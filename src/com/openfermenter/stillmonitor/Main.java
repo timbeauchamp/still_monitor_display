@@ -1,4 +1,4 @@
-package sample;
+package com.openfermenter.stillmonitor;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -12,11 +12,8 @@ import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
@@ -25,35 +22,30 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
-
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import java.awt.event.ActionListener;
-import java.io.BufferedReader;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Date;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
 
 public class Main extends Application
 {
-
     // public static String dataURL = "http://localhost://temps.xml";
     public static String dataURL = "http://192.168.1.15/temps.xml";
     Text updateTime;
     RemoteData rd = new RemoteData();
     Timer timer;
-
-    Label[] tempControl   = new Label[4];
-    Label[] rangeControl  = new Label[4];
-    Label[] switchControl = new Label[4];
+    StillMonitorPreferences prefs;
+    DisplayBlocks dBs;
 
     public static void main(String[] args)
     {
@@ -63,7 +55,14 @@ public class Main extends Application
     @Override
     public void start(Stage primaryStage) throws Exception
     {
+        prefs = new StillMonitorPreferences();
+        prefs.setSourceRef("http://192.168.1.15/temps.xml");
+        dataURL = prefs.getSourceRef();
+
+        dBs = buildDisplayBlocks();
+
         buildUI(primaryStage);
+
         primaryStage.show();
 
         DataRetrievalService service = new DataRetrievalService();
@@ -94,12 +93,14 @@ public class Main extends Application
     {
         timer = new Timer();
 
-        timer.schedule(new TimerTask() {
-            public void run() {
-                Platform.runLater(new Runnable() {
+        timer.schedule(new TimerTask()
+        {
+            public void run()
+            {
+                Platform.runLater(new Runnable()
+                {
                     public void run()
                     {
-                        System.out.println("Updating UI");
                         updateUI(doc2RemoteData(getData(dataURL)));
                     }
                 });
@@ -107,51 +108,75 @@ public class Main extends Application
         }, 5000, 10000);
     }
 
+    private DisplayBlocks buildDisplayBlocks()
+    {
+        dBs = new DisplayBlocks();
+        dBs.addTemp(new DisplayBlock("Temp 0",1,3));
+        dBs.addTemp(new DisplayBlock("Temp 1",1,4));
+        dBs.addTemp(new DisplayBlock("Temp 2",1,5));
+        dBs.addTemp(new DisplayBlock("Temp 3",1,6));
+
+        dBs.addSwitch(new DisplayBlock("Range 0", 2, 3));
+        dBs.addRange(new DisplayBlock("Range 1", 2, 4));
+        dBs.addRange(new DisplayBlock("Range 2", 2, 5));
+        dBs.addRange(new DisplayBlock("Range 3", 2, 6));
+
+        dBs.addSwitch(new DisplayBlock("Switch 0", 3, 3));
+        dBs.addSwitch(new DisplayBlock("Switch 1", 3, 4));
+        dBs.addSwitch(new DisplayBlock("Switch 2", 3, 5));
+        dBs.addSwitch(new DisplayBlock("Switch 3", 3, 6));
+
+        return dBs;
+    }
 
     private void buildUI(Stage primaryStage)
     {
         BorderPane root = new BorderPane();
         primaryStage.setTitle("Still Monitor Display");
 
-        tempControl[0] = new Label("Temp 1");
-        tempControl[1] = new Label("Temp 2");
-        tempControl[2] = new Label("Temp 3");
-        tempControl[3] = new Label("Temp 4");
-
-        rangeControl[0] = new Label("Range 1");
-        rangeControl[1] = new Label("Range 2");
-        rangeControl[2] = new Label("Range 3");
-        rangeControl[3] = new Label("Range 4");
-
-        switchControl[0] = new Label("Switch 1");
-        switchControl[1] = new Label("Switch 2");
-        switchControl[2] = new Label("Switch 3");
-        switchControl[3] = new Label("Switch 4");
 
         GridPane grid = new GridPane();
+//        grid.setStyle("-fx-background-color: #336699;");
         grid.setAlignment(Pos.CENTER);
         grid.setHgap(10);
         grid.setVgap(10);
         grid.setPadding(new Insets(25, 25, 25, 25));
 
+        BorderPane border = new BorderPane();
+        border.setCenter(grid);
+        Scene scene = new Scene(border, 600, 475);
+
+
+        MenuBar menuBar = new MenuBar();
+        menuBar.setUseSystemMenuBar(true);
+
+        Menu menuFile = new Menu("File");
+        Menu menuEdit = new Menu("Edit");
+        Menu menuView = new Menu("View");
+
+        menuView.setOnAction(new EventHandler<ActionEvent>()
+        {
+            public void handle(ActionEvent t)
+            {
+                showTargetChooser();
+            }
+        });
+
+        menuBar.getMenus().addAll(menuFile, menuEdit, menuView);
+        border.setTop(menuBar);
+
+
+
         grid.add(new Text("Last Update:"), 1, 8);
         updateTime = new Text("");
         grid.add(updateTime, 2, 8, 3, 1);
 
-        grid.add(tempControl[0], 1, 3);
-        grid.add(tempControl[1], 1, 4);
-        grid.add(tempControl[2], 1, 5);
-        grid.add(tempControl[3], 1, 6);
-
-        grid.add(rangeControl[0], 2, 3);
-        grid.add(rangeControl[1], 2, 4);
-        grid.add(rangeControl[2], 2, 5);
-        grid.add(rangeControl[3], 2, 6);
-
-        grid.add(switchControl[0], 3, 3);
-        grid.add(switchControl[1], 3, 4);
-        grid.add(switchControl[2], 3, 5);
-        grid.add(switchControl[3], 3, 6);
+        int column = 1;
+        int row = 3;
+        for(DisplayBlock control : dBs.getAll())
+        {
+            grid.add(control, control.column, control.row);
+        }
 
         Text scenetitle = new Text("Data");
         scenetitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
@@ -169,8 +194,22 @@ public class Main extends Application
         switchesTitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
         grid.add(switchesTitle, 3, 2, 1, 1);
 
-        Scene scene = new Scene(grid, 600, 475);
+
         primaryStage.setScene(scene);
+    }
+
+    private void showTargetChooser()
+    {
+        Dialog dialog = new Dialog();
+
+        dialog.showAndWait()
+                .filter(response -> response == ButtonType.OK);
+//                .ifPresent(response -> formatSystem());
+    }
+
+    private static javafx.scene.Node getTempNode(String  name)
+    {
+        return new Label(name);
     }
 
     private static Document getData(String urlStr)
@@ -208,79 +247,115 @@ public class Main extends Application
         return doc;
     }
 
+
+
     private static RemoteData doc2RemoteData(Document doc)
     {
+
+//        TransformerFactory tf = TransformerFactory.newInstance();
+//        Transformer transformer = null;
+//        try
+//        {
+//            transformer = tf.newTransformer();
+//            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+//            StringWriter writer = new StringWriter();
+//            transformer.transform(new DOMSource(doc), new StreamResult(writer));
+//            String output = writer.getBuffer().toString(); // .replaceAll("\n|\r", "");
+//            System.out.println(output);
+//        } catch (Exception e)
+//        {
+//            e.printStackTrace();
+//        }
+
         RemoteData rd = new RemoteData();
         NodeList currentNodeList = doc.getElementsByTagName("temp");
         int len = currentNodeList.getLength();
 
-        if (len > 0)
-            rd.temps = new double[len];
-
         Node currentNode;
+        String nodeName;
         String nodeVal;
         for (int i = 0; i < len; i++)
         {
             currentNode = currentNodeList.item(i);
+            nodeName = "temp " + currentNode.getAttributes().getNamedItem("id").getNodeValue();
             nodeVal = currentNode.getFirstChild().getNodeValue();
-            rd.temps[i] = Double.parseDouble(nodeVal);
+            rd.temps.put(nodeName, Double.parseDouble(nodeVal));
         }
 
         currentNodeList = doc.getElementsByTagName("range");
         len = currentNodeList.getLength();
 
-        if (len > 0)
-            rd.ranges = new double[len];
-
         for (int i = 0; i < len; i++)
         {
             currentNode = currentNodeList.item(i);
+            nodeName = "range " + currentNode.getAttributes().getNamedItem("id").getNodeValue();
             nodeVal = currentNode.getFirstChild().getNodeValue();
-            rd.ranges[i] = Double.parseDouble(nodeVal);
+            rd.ranges.put(nodeName, Double.parseDouble(nodeVal));
         }
 
         currentNodeList = doc.getElementsByTagName("switch");
         len = currentNodeList.getLength();
 
-        if (len > 0)
-            rd.switches = new boolean[len];
-
         for (int i = 0; i < len; i++)
         {
             currentNode = currentNodeList.item(i);
+            nodeName = "switch " + currentNode.getAttributes().getNamedItem("id").getNodeValue();
             nodeVal = currentNode.getFirstChild().getNodeValue();
-            rd.switches[i] = Boolean.parseBoolean(nodeVal);
+            rd.switches.put(nodeName, Boolean.parseBoolean(nodeVal));
         }
         return rd;
      }
 
     private void updateUI(RemoteData rd)
     {
-        int index = 0;
-        for (double temp : rd.temps)
+        DisplayBlock db;
+
+        Set<String> keys = rd.temps.keySet();
+        for (String name: keys)
         {
-            if (index > 3)
-                break;
-            tempControl[index].setText(Double.toString(rd.temps[index++]));
+            db = dBs.getDisplayBlock(name);
+
+            if(db != null)
+            {
+                db.setText(Double.toString(rd.temps.get(name)));
+            }
+            else
+            {
+                System.out.println("unused temp data: " + name );
+            }
         }
 
-        index = 0;
-        for (double range : rd.ranges)
+        keys = rd.ranges.keySet();
+        for (String name: keys)
         {
-            if (index > 3)
-                break;
-            rangeControl[index].setText(Double.toString(rd.ranges[index++]));
+            db = dBs.getDisplayBlock(name);
+
+            if(db != null)
+            {
+                db.setText(Double.toString(rd.ranges.get(name)));
+            }
+            else
+            {
+                System.out.println("unused range data: " + name );
+            }
         }
 
-        index = 0;
-        for (boolean aSwitch : rd.switches)
+        keys = rd.switches.keySet();
+        for (String name: keys)
         {
-            if (index > 3)
-                break;
-            switchControl[index].setText(Boolean.toString(rd.switches[index++]));
+            db = dBs.getDisplayBlock(name);
+
+            if(db != null)
+            {
+                db.setText(Boolean.toString(rd.switches.get(name)));
+            }
+            else
+            {
+                System.out.println("unused switch data: " + name );
+            }
         }
+
         updateTime.setText(new Date().toString());
-        System.out.println("Updated UI");
     }
 
     private static class DataRetrievalService extends Service<RemoteData>
@@ -318,14 +393,14 @@ public class Main extends Application
 
     private static class RemoteData
     {
-        public double[] temps = new double[0];
-        public double[] ranges = new double[0];
-        public boolean[] switches = new boolean[0];
+        public Hashtable<String, Double> temps = new Hashtable<String, Double>();
+        public Hashtable<String, Double> ranges = new Hashtable<String, Double>();
+        public Hashtable<String, Boolean> switches = new Hashtable<String, Boolean>();
 
         @Override
         public String toString()
         {
-            return "Num Temps:"+ temps.length + "  Num Ranges:"+ ranges.length + "  Num Swithces: "+ switches.length;
+            return "Num Temps:"+ temps.size() + "  Num Ranges:"+ ranges.size() + "  Num Swithces: "+ switches.size();
         }
     }
 }
