@@ -4,6 +4,8 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.concurrent.WorkerStateEvent;
@@ -56,7 +58,6 @@ public class Main extends Application
     public void start(Stage primaryStage) throws Exception
     {
         prefs = new StillMonitorPreferences();
-        prefs.setSourceRef("http://192.168.1.15/temps.xml");
         dataURL = prefs.getSourceRef();
 
         dBs = buildDisplayBlocks();
@@ -101,6 +102,7 @@ public class Main extends Application
                 {
                     public void run()
                     {
+                        System.out.println("Updating from: " + dataURL);
                         updateUI(doc2RemoteData(getData(dataURL)));
                     }
                 });
@@ -111,15 +113,16 @@ public class Main extends Application
     private DisplayBlocks buildDisplayBlocks()
     {
         dBs = new DisplayBlocks();
-        dBs.addTemp(new DisplayBlock("Temp 0",1,3));
-        dBs.addTemp(new DisplayBlock("Temp 1",1,4));
-        dBs.addTemp(new DisplayBlock("Temp 2",1,5));
-        dBs.addTemp(new DisplayBlock("Temp 3",1,6));
 
-        dBs.addSwitch(new DisplayBlock("Range 0", 2, 3));
-        dBs.addRange(new DisplayBlock("Range 1", 2, 4));
-        dBs.addRange(new DisplayBlock("Range 2", 2, 5));
-        dBs.addRange(new DisplayBlock("Range 3", 2, 6));
+        dBs.addTemp(new DisplayBlockTemp("Temp 0",1,3));
+        dBs.addTemp(new DisplayBlockTemp("Temp 1",1,4));
+        dBs.addTemp(new DisplayBlockTemp("Temp 2",1,5));
+        dBs.addTemp(new DisplayBlockTemp("Temp 3",1,6));
+
+        dBs.addSwitch(new DisplayBlockRange("Range 0", 2, 3));
+        dBs.addRange(new DisplayBlockRange("Range 1", 2, 4));
+        dBs.addRange(new DisplayBlockRange("Range 2", 2, 5));
+        dBs.addRange(new DisplayBlockRange("Range 3", 2, 6));
 
         dBs.addSwitch(new DisplayBlock("Switch 0", 3, 3));
         dBs.addSwitch(new DisplayBlock("Switch 1", 3, 4));
@@ -152,20 +155,31 @@ public class Main extends Application
 
         Menu menuFile = new Menu("File");
         Menu menuEdit = new Menu("Edit");
-        Menu menuView = new Menu("View");
+        Menu menuTarget = new Menu("Target");
 
-        menuView.setOnAction(new EventHandler<ActionEvent>()
+        String targetString = prefs.getSourceSelect();
+        ToggleGroup tg = new ToggleGroup();
+        // --- Creating check menu items
+        RadioMenuItem localhostTarget = createMenuItem ("Localhost", "localhost", tg, targetString.equalsIgnoreCase("localhost"));
+        RadioMenuItem localfileTarget = createMenuItem ("Local File", "localfile", tg, targetString.equalsIgnoreCase("localfile"));
+        RadioMenuItem raspberryTarget = createMenuItem ("Raspberry", "raspberry", tg, targetString.equalsIgnoreCase("raspberry"));
+        menuTarget.getItems().addAll(localhostTarget, localfileTarget, raspberryTarget);
+
+
+
+        MenuItem targetMenuItem = new MenuItem("Change Target");
+        targetMenuItem.setOnAction(new EventHandler<ActionEvent>()
         {
             public void handle(ActionEvent t)
             {
-                showTargetChooser();
+//                showTargetChooser();
             }
         });
 
-        menuBar.getMenus().addAll(menuFile, menuEdit, menuView);
+        menuEdit.getItems().addAll(menuTarget,targetMenuItem);
+
+        menuBar.getMenus().addAll(menuFile, menuEdit);
         border.setTop(menuBar);
-
-
 
         grid.add(new Text("Last Update:"), 1, 8);
         updateTime = new Text("");
@@ -194,8 +208,28 @@ public class Main extends Application
         switchesTitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
         grid.add(switchesTitle, 3, 2, 1, 1);
 
-
         primaryStage.setScene(scene);
+    }
+
+    // The createMenuItem method
+    private RadioMenuItem createMenuItem (String title, String choice, ToggleGroup tg,  boolean selected)
+    {
+        RadioMenuItem rmi = new RadioMenuItem(title);
+        rmi.setToggleGroup(tg);
+        rmi.setSelected(selected);
+        rmi.selectedProperty().addListener(new ChangeListener<Boolean>()
+        {
+            public void changed(ObservableValue ov, Boolean old_val, Boolean new_val)
+            {
+                if(new_val == true)
+                {
+                    prefs.setSourceSelect(choice);
+                    prefs.savePrefs();
+                    dataURL = prefs.getSourceRef();
+                }
+            }
+        });
+        return rmi;
     }
 
     private void showTargetChooser()
@@ -218,6 +252,17 @@ public class Main extends Application
         Document doc = null;
         try
         {
+            if(!urlStr.startsWith("http"))
+            {
+                try
+                {
+                    urlStr = (new java.io.File(dataURL)).toURI().toURL().toString();
+                } catch (MalformedURLException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+
             url = new URL(urlStr);
 
         } catch (MalformedURLException e)
@@ -247,25 +292,8 @@ public class Main extends Application
         return doc;
     }
 
-
-
     private static RemoteData doc2RemoteData(Document doc)
     {
-
-//        TransformerFactory tf = TransformerFactory.newInstance();
-//        Transformer transformer = null;
-//        try
-//        {
-//            transformer = tf.newTransformer();
-//            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
-//            StringWriter writer = new StringWriter();
-//            transformer.transform(new DOMSource(doc), new StreamResult(writer));
-//            String output = writer.getBuffer().toString(); // .replaceAll("\n|\r", "");
-//            System.out.println(output);
-//        } catch (Exception e)
-//        {
-//            e.printStackTrace();
-//        }
 
         RemoteData rd = new RemoteData();
         NodeList currentNodeList = doc.getElementsByTagName("temp");
