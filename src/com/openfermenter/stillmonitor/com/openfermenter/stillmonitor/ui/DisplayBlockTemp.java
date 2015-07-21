@@ -1,4 +1,6 @@
-package com.openfermenter.stillmonitor;
+package com.openfermenter.stillmonitor.com.openfermenter.stillmonitor.ui;
+
+import com.openfermenter.stillmonitor.com.openfermenter.stillmonitor.ui.DisplayBlock;
 
 /**
  * Created by tbeauch on 7/18/15.

@@ -1,5 +1,6 @@
 package com.openfermenter.stillmonitor;
 
+import com.openfermenter.stillmonitor.com.openfermenter.stillmonitor.ui.*;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
@@ -27,14 +28,7 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
@@ -43,11 +37,15 @@ public class Main extends Application
 {
     // public static String dataURL = "http://localhost://temps.xml";
     public static String dataURL = "http://192.168.1.15/temps.xml";
-    Text updateTime;
+//    Text updateTime;
     RemoteData rd = new RemoteData();
     Timer timer;
-    StillMonitorPreferences prefs;
-    DisplayBlocks dBs;
+    public static StillMonitorPreferences prefs;
+    public static DisplayBlocks dBs;
+
+    private Stage primaryStage;
+
+    private static MainUI mainUI;
 
     public static void main(String[] args)
     {
@@ -57,13 +55,16 @@ public class Main extends Application
     @Override
     public void start(Stage primaryStage) throws Exception
     {
+        this.primaryStage = primaryStage;
         prefs = new StillMonitorPreferences();
         dataURL = prefs.getSourceRef();
 
         dBs = buildDisplayBlocks();
 
-        buildUI(primaryStage);
+        mainUI = new MainUI(primaryStage, this);
+        //buildUI(primaryStage);
 
+        primaryStage.setScene(mainUI.getScene());
         primaryStage.show();
 
         DataRetrievalService service = new DataRetrievalService();
@@ -75,7 +76,7 @@ public class Main extends Application
             {
                 RemoteData rd = (RemoteData) t.getSource().getValue();
                 System.out.println("done:" + rd.toString());
-                updateUI(rd);
+                mainUI.updateUI(rd);
             }
         });
         service.start();
@@ -89,6 +90,19 @@ public class Main extends Application
         timer.cancel();
     }
 
+    public void showAssigner()
+    {
+        NodeAssignerUI na = new NodeAssignerUI(primaryStage, this);
+        primaryStage.setScene(na.getScene());
+        primaryStage.show();
+    }
+
+    public void showMainUI()
+    {
+        primaryStage.setScene(mainUI.getScene());
+        primaryStage.show();
+
+    }
 
     public void startUpdater()
     {
@@ -103,7 +117,7 @@ public class Main extends Application
                     public void run()
                     {
                         System.out.println("Updating from: " + dataURL);
-                        updateUI(doc2RemoteData(getData(dataURL)));
+                        mainUI.updateUI(doc2RemoteData(getData(dataURL)));
                     }
                 });
             }
@@ -132,105 +146,6 @@ public class Main extends Application
         return dBs;
     }
 
-    private void buildUI(Stage primaryStage)
-    {
-        BorderPane root = new BorderPane();
-        primaryStage.setTitle("Still Monitor Display");
-
-
-        GridPane grid = new GridPane();
-//        grid.setStyle("-fx-background-color: #336699;");
-        grid.setAlignment(Pos.CENTER);
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(25, 25, 25, 25));
-
-        BorderPane border = new BorderPane();
-        border.setCenter(grid);
-        Scene scene = new Scene(border, 600, 475);
-
-
-        MenuBar menuBar = new MenuBar();
-        menuBar.setUseSystemMenuBar(true);
-
-        Menu menuFile = new Menu("File");
-        Menu menuEdit = new Menu("Edit");
-        Menu menuTarget = new Menu("Target");
-
-        String targetString = prefs.getSourceSelect();
-        ToggleGroup tg = new ToggleGroup();
-        // --- Creating check menu items
-        RadioMenuItem localhostTarget = createMenuItem ("Localhost", "localhost", tg, targetString.equalsIgnoreCase("localhost"));
-        RadioMenuItem localfileTarget = createMenuItem ("Local File", "localfile", tg, targetString.equalsIgnoreCase("localfile"));
-        RadioMenuItem raspberryTarget = createMenuItem ("Raspberry", "raspberry", tg, targetString.equalsIgnoreCase("raspberry"));
-        menuTarget.getItems().addAll(localhostTarget, localfileTarget, raspberryTarget);
-
-
-
-        MenuItem targetMenuItem = new MenuItem("Change Target");
-        targetMenuItem.setOnAction(new EventHandler<ActionEvent>()
-        {
-            public void handle(ActionEvent t)
-            {
-//                showTargetChooser();
-            }
-        });
-
-        menuEdit.getItems().addAll(menuTarget,targetMenuItem);
-
-        menuBar.getMenus().addAll(menuFile, menuEdit);
-        border.setTop(menuBar);
-
-        grid.add(new Text("Last Update:"), 1, 8);
-        updateTime = new Text("");
-        grid.add(updateTime, 2, 8, 3, 1);
-
-        int column = 1;
-        int row = 3;
-        for(DisplayBlock control : dBs.getAll())
-        {
-            grid.add(control, control.column, control.row);
-        }
-
-        Text scenetitle = new Text("Data");
-        scenetitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
-        grid.add(scenetitle, 0, 0, 1, 1);
-
-        Text tempsTitle = new Text("Temps");
-        tempsTitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
-        grid.add(tempsTitle, 1, 2, 1, 1);
-
-        Text rangesTitle = new Text("Ranges");
-        rangesTitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
-        grid.add(rangesTitle, 2, 2, 1, 1);
-
-        Text switchesTitle = new Text("Switches");
-        switchesTitle.setFont(Font.font("Tahoma", FontWeight.NORMAL, 20));
-        grid.add(switchesTitle, 3, 2, 1, 1);
-
-        primaryStage.setScene(scene);
-    }
-
-    // The createMenuItem method
-    private RadioMenuItem createMenuItem (String title, String choice, ToggleGroup tg,  boolean selected)
-    {
-        RadioMenuItem rmi = new RadioMenuItem(title);
-        rmi.setToggleGroup(tg);
-        rmi.setSelected(selected);
-        rmi.selectedProperty().addListener(new ChangeListener<Boolean>()
-        {
-            public void changed(ObservableValue ov, Boolean old_val, Boolean new_val)
-            {
-                if(new_val == true)
-                {
-                    prefs.setSourceSelect(choice);
-                    prefs.savePrefs();
-                    dataURL = prefs.getSourceRef();
-                }
-            }
-        });
-        return rmi;
-    }
 
     private void showTargetChooser()
     {
@@ -334,57 +249,6 @@ public class Main extends Application
         return rd;
      }
 
-    private void updateUI(RemoteData rd)
-    {
-        DisplayBlock db;
-
-        Set<String> keys = rd.temps.keySet();
-        for (String name: keys)
-        {
-            db = dBs.getDisplayBlock(name);
-
-            if(db != null)
-            {
-                db.setText(Double.toString(rd.temps.get(name)));
-            }
-            else
-            {
-                System.out.println("unused temp data: " + name );
-            }
-        }
-
-        keys = rd.ranges.keySet();
-        for (String name: keys)
-        {
-            db = dBs.getDisplayBlock(name);
-
-            if(db != null)
-            {
-                db.setText(Double.toString(rd.ranges.get(name)));
-            }
-            else
-            {
-                System.out.println("unused range data: " + name );
-            }
-        }
-
-        keys = rd.switches.keySet();
-        for (String name: keys)
-        {
-            db = dBs.getDisplayBlock(name);
-
-            if(db != null)
-            {
-                db.setText(Boolean.toString(rd.switches.get(name)));
-            }
-            else
-            {
-                System.out.println("unused switch data: " + name );
-            }
-        }
-
-        updateTime.setText(new Date().toString());
-    }
 
     private static class DataRetrievalService extends Service<RemoteData>
     {
@@ -419,16 +283,4 @@ public class Main extends Application
         }
     }
 
-    private static class RemoteData
-    {
-        public Hashtable<String, Double> temps = new Hashtable<String, Double>();
-        public Hashtable<String, Double> ranges = new Hashtable<String, Double>();
-        public Hashtable<String, Boolean> switches = new Hashtable<String, Boolean>();
-
-        @Override
-        public String toString()
-        {
-            return "Num Temps:"+ temps.size() + "  Num Ranges:"+ ranges.size() + "  Num Swithces: "+ switches.size();
-        }
-    }
 }

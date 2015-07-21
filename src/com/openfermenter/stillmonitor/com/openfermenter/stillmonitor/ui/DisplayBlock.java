@@ -1,18 +1,19 @@
-package com.openfermenter.stillmonitor;
+package com.openfermenter.stillmonitor.com.openfermenter.stillmonitor.ui;
 
 import javafx.scene.Parent;
 import javafx.scene.control.Label;
+import javafx.scene.layout.Pane;
 
 /**
  * Created by tbeauch on 7/16/15.
  */
-public class DisplayBlock extends Parent
+public class DisplayBlock extends Pane
 {
     private String id = "";
     private String text = "";
-    Label label;
-    int row = 0;
-    int column = 0;
+    protected Label label;
+    private int row = 0;
+    private int column = 0;
 
     public DisplayBlock()
     {
@@ -25,8 +26,8 @@ public class DisplayBlock extends Parent
     {
         this();
         this.id = id;
-        this.row = row;
-        this.column = column;
+        this.setRow(row);
+        this.setColumn(column);
         label.setText(text);
     }
 
@@ -49,5 +50,25 @@ public class DisplayBlock extends Parent
     public String getID()
     {
         return this.id;
+    }
+
+    public int getColumn()
+    {
+        return column;
+    }
+
+    public void setColumn(int column)
+    {
+        this.column = column;
+    }
+
+    public int getRow()
+    {
+        return row;
+    }
+
+    public void setRow(int row)
+    {
+        this.row = row;
     }
 }
